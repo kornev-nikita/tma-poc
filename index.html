@@ -2,15 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>TMA PoC</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             padding: 16px;
             min-height: 100vh;
+            background-color: var(--tg-theme-bg-color, #1c1c1e);
+            color: var(--tg-theme-text-color, #ffffff);
             transition: background-color 0.3s, color 0.3s;
         }
         .card {
@@ -18,6 +20,7 @@
             padding: 16px;
             margin-bottom: 12px;
             backdrop-filter: blur(10px);
+            background: var(--tg-theme-secondary-bg-color, #2c2c2e);
         }
         .card-title {
             font-size: 13px;
@@ -25,6 +28,7 @@
             letter-spacing: 0.5px;
             opacity: 0.6;
             margin-bottom: 8px;
+            color: var(--tg-theme-hint-color, #8e8e93);
         }
         .card-value {
             font-size: 20px;
@@ -47,82 +51,125 @@
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .full { grid-column: 1 / -1; }
         h1 { font-size: 24px; margin-bottom: 16px; }
+        .fallback {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+            text-align: center;
+            gap: 12px;
+        }
+        .fallback-icon { font-size: 48px; }
+        .fallback-text { font-size: 18px; opacity: 0.7; }
+        .error-box {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 8px;
+            background: #ff3b3015;
+            color: #ff6b6b;
+            font-size: 13px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
     </style>
 </head>
 <body>
     <h1>TMA Proof of Concept</h1>
-    <div id="app"></div>
+    <div id="app">
+        <div class="fallback">
+            <div class="fallback-icon">&#128241;</div>
+            <div class="fallback-text">Loading...</div>
+        </div>
+    </div>
 
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
+        try {
+            if (!window.Telegram?.WebApp) {
+                document.getElementById('app').innerHTML = `
+                    <div class="fallback">
+                        <div class="fallback-icon">&#128241;</div>
+                        <div class="fallback-text">Open this app from Telegram</div>
+                        <div style="font-size:13px;opacity:0.5;margin-top:8px">
+                            t.me/nk_mini_apps_bot/dashboard
+                        </div>
+                    </div>`;
+                throw new Error('Telegram WebApp SDK not available');
+            }
 
-        // Apply Telegram theme
-        const root = document.documentElement;
-        document.body.style.backgroundColor = tg.themeParams.bg_color || '#ffffff';
-        document.body.style.color = tg.themeParams.text_color || '#000000';
+            const tg = window.Telegram.WebApp;
+            tg.ready();
+            tg.expand();
 
-        const cardBg = tg.themeParams.secondary_bg_color || '#f2f2f7';
-        const hintColor = tg.themeParams.hint_color || '#8e8e93';
-        const linkColor = tg.themeParams.link_color || '#007aff';
+            const user = tg.initDataUnsafe?.user;
+            const app = document.getElementById('app');
+            const hintColor = tg.themeParams?.hint_color || '#8e8e93';
+            const linkColor = tg.themeParams?.link_color || '#007aff';
 
-        const user = tg.initDataUnsafe?.user;
-        const app = document.getElementById('app');
+            function card(title, value, detail, cls) {
+                return `<div class="card ${cls || ''}">
+                    <div class="card-title">${title}</div>
+                    <div class="card-value">${value}</div>
+                    ${detail ? `<div class="card-detail">${detail}</div>` : ''}
+                </div>`;
+            }
 
-        function card(title, value, detail, cls) {
-            return `<div class="card ${cls || ''}" style="background:${cardBg}">
-                <div class="card-title" style="color:${hintColor}">${title}</div>
-                <div class="card-value">${value}</div>
-                ${detail ? `<div class="card-detail">${detail}</div>` : ''}
-            </div>`;
-        }
+            const checks = {
+                'WebApp SDK': !!tg.version,
+                'User Data': !!user,
+                'Theme Params': !!tg.themeParams?.bg_color,
+                'Platform': !!tg.platform,
+            };
 
-        const checks = {
-            'WebApp SDK': !!tg.version,
-            'User Data': !!user,
-            'Theme Params': !!tg.themeParams.bg_color,
-            'Platform': !!tg.platform,
-        };
+            const checksHtml = Object.entries(checks).map(([k, v]) =>
+                `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0">
+                    <span>${k}</span>
+                    <span class="status ${v ? 'status-ok' : 'status-fail'}">${v ? 'OK' : 'FAIL'}</span>
+                </div>`
+            ).join('');
 
-        const checksHtml = Object.entries(checks).map(([k, v]) =>
-            `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0">
-                <span>${k}</span>
-                <span class="status ${v ? 'status-ok' : 'status-fail'}">${v ? 'OK' : 'FAIL'}</span>
-            </div>`
-        ).join('');
+            const themeHtml = Object.entries(tg.themeParams || {}).map(([k, v]) =>
+                v ? `<div style="text-align:center">
+                    <div style="width:36px;height:36px;border-radius:8px;background:${v};border:1px solid ${hintColor}30"></div>
+                    <div style="font-size:10px;margin-top:4px;color:${hintColor}">${k.replace(/_/g,' ').replace('color','')}</div>
+                </div>` : ''
+            ).join('');
 
-        app.innerHTML = `
-            <div class="grid">
-                ${card('User', user ? `${user.first_name} ${user.last_name || ''}` : 'N/A',
-                    user ? `@${user.username} · ID: ${user.id}` : 'Open from Telegram to see data')}
-                ${card('Platform', tg.platform || 'unknown',
-                    `SDK v${tg.version} · ${tg.colorScheme} mode`)}
-            </div>
-            <div class="card full" style="background:${cardBg}">
-                <div class="card-title" style="color:${hintColor}">API Checks</div>
-                ${checksHtml}
-            </div>
-            <div class="card full" style="background:${cardBg}">
-                <div class="card-title" style="color:${hintColor}">Theme Colors</div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-                    ${Object.entries(tg.themeParams).map(([k, v]) =>
-                        `<div style="text-align:center">
-                            <div style="width:36px;height:36px;border-radius:8px;background:${v};border:1px solid ${hintColor}30"></div>
-                            <div style="font-size:10px;margin-top:4px;color:${hintColor}">${k.replace(/_/g,' ').replace('color','')}</div>
-                        </div>`
-                    ).join('')}
+            app.innerHTML = `
+                <div class="grid">
+                    ${card('User', user ? `${user.first_name} ${user.last_name || ''}` : 'N/A',
+                        user ? `@${user.username} &middot; ID: ${user.id}` : 'Open from Telegram to see data')}
+                    ${card('Platform', tg.platform || 'unknown',
+                        `SDK v${tg.version} &middot; ${tg.colorScheme} mode`)}
                 </div>
-            </div>
-            <div style="text-align:center;margin-top:20px;font-size:12px;color:${hintColor}">
-                Pipeline: Claude Code → GitHub Pages → BotFather → TMA
-            </div>
-        `;
+                <div class="card full">
+                    <div class="card-title">API Checks</div>
+                    ${checksHtml}
+                </div>
+                <div class="card full">
+                    <div class="card-title">Theme Colors</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+                        ${themeHtml}
+                    </div>
+                </div>
+                <div style="text-align:center;margin-top:20px;font-size:12px;color:${hintColor}">
+                    Pipeline: Claude Code &rarr; GitHub Pages &rarr; BotFather &rarr; TMA
+                </div>
+            `;
 
-        // Main button demo
-        tg.MainButton.setText('Close App');
-        tg.MainButton.show();
-        tg.MainButton.onClick(() => tg.close());
+            tg.MainButton.setText('Close App');
+            tg.MainButton.show();
+            tg.MainButton.onClick(() => tg.close());
+
+        } catch (e) {
+            console.error('TMA init error:', e);
+            const errBox = document.createElement('div');
+            errBox.className = 'error-box';
+            errBox.textContent = `Error: ${e.message}\n\nUA: ${navigator.userAgent}`;
+            document.getElementById('app').appendChild(errBox);
+        }
     </script>
 </body>
 </html>
