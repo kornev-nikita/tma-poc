@@ -1,175 +1,453 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>TMA PoC</title>
+    <title>Finance Dashboard</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            padding: 16px;
+            padding: 12px;
             min-height: 100vh;
             background-color: var(--tg-theme-bg-color, #1c1c1e);
             color: var(--tg-theme-text-color, #ffffff);
-            transition: background-color 0.3s, color 0.3s;
         }
-        .card {
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 12px;
-            backdrop-filter: blur(10px);
+        .header { margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 20px; font-weight: 700; }
+        .header .sub { font-size: 12px; opacity: 0.5; }
+        .gear {
+            width: 32px; height: 32px; border-radius: 8px;
             background: var(--tg-theme-secondary-bg-color, #2c2c2e);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; cursor: pointer;
+        }
+        .kpi-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+        .kpi {
+            background: var(--tg-theme-secondary-bg-color, #2c2c2e);
+            border-radius: 12px; padding: 10px; text-align: center;
+        }
+        .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.5; }
+        .kpi-value { font-size: 18px; font-weight: 700; margin-top: 2px; }
+        .kpi-value.red { color: #ff453a; }
+        .kpi-value.orange { color: #ff9f0a; }
+        .kpi-value.green { color: #30d158; }
+        .card {
+            background: var(--tg-theme-secondary-bg-color, #2c2c2e);
+            border-radius: 12px; padding: 14px; margin-bottom: 10px;
         }
         .card-title {
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            opacity: 0.6;
-            margin-bottom: 8px;
-            color: var(--tg-theme-hint-color, #8e8e93);
+            font-size: 12px; text-transform: uppercase;
+            letter-spacing: 0.5px; opacity: 0.5; margin-bottom: 10px;
         }
-        .card-value {
-            font-size: 20px;
-            font-weight: 600;
+        .budget-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .budget-row:last-child { margin-bottom: 0; }
+        .budget-name { font-size: 13px; flex: 1; }
+        .budget-nums { font-size: 12px; opacity: 0.7; margin-left: 8px; white-space: nowrap; }
+        .budget-bar-bg {
+            width: 60px; height: 6px; background: rgba(255,255,255,0.1);
+            border-radius: 3px; margin-left: 8px; overflow: hidden; flex-shrink: 0;
         }
-        .card-detail {
-            font-size: 14px;
-            opacity: 0.7;
-            margin-top: 4px;
+        .budget-bar { height: 100%; border-radius: 3px; }
+        .bar-ok { background: #30d158; }
+        .bar-warn { background: #ff9f0a; }
+        .bar-over { background: #ff453a; }
+        .debt-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
         }
-        .status {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
+        .debt-item:last-child { border-bottom: none; }
+        .debt-name { font-size: 13px; flex: 1; }
+        .debt-rate { font-size: 11px; opacity: 0.5; margin-left: 4px; }
+        .debt-balance { font-size: 13px; font-weight: 600; text-align: right; }
+        .priority-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            margin-right: 8px; flex-shrink: 0;
         }
-        .status-ok { background: #34c75920; color: #34c759; }
-        .status-fail { background: #ff3b3020; color: #ff3b30; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .full { grid-column: 1 / -1; }
-        h1 { font-size: 24px; margin-bottom: 16px; }
+        .dot-critical { background: #ff453a; }
+        .dot-high { background: #ff9f0a; }
+        .dot-medium { background: #ffd60a; }
+        .dot-low { background: #30d158; }
+        .dot-frozen { background: #636366; }
+        .pay-item { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; }
+        .pay-date { opacity: 0.5; width: 30px; }
+        .pay-name { flex: 1; margin-left: 8px; }
+        .pay-amount { font-weight: 600; }
+        .chart-row { display: flex; align-items: flex-end; gap: 4px; height: 60px; margin-top: 8px; }
+        .chart-bar-wrap { flex: 1; text-align: center; }
+        .chart-bar {
+            width: 100%; border-radius: 4px 4px 0 0;
+            background: var(--tg-theme-button-color, #007aff);
+        }
+        .chart-label { font-size: 9px; opacity: 0.4; margin-top: 3px; }
+        .window-badge {
+            display: inline-block; padding: 3px 8px; border-radius: 10px;
+            font-size: 11px; font-weight: 600; background: #30d15820; color: #30d158; margin-left: 6px;
+        }
+        .tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+        .tab {
+            flex: 1; padding: 8px; border-radius: 10px; font-size: 12px; font-weight: 600;
+            text-align: center; cursor: pointer;
+            background: var(--tg-theme-secondary-bg-color, #2c2c2e); opacity: 0.5;
+        }
+        .tab.active {
+            opacity: 1; background: var(--tg-theme-button-color, #007aff);
+            color: var(--tg-theme-button-text-color, #fff);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .footer { text-align: center; font-size: 11px; opacity: 0.3; margin-top: 16px; padding-bottom: 20px; }
         .fallback {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 60vh;
-            text-align: center;
-            gap: 12px;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; min-height: 60vh; text-align: center; gap: 12px;
         }
         .fallback-icon { font-size: 48px; }
         .fallback-text { font-size: 18px; opacity: 0.7; }
         .error-box {
-            margin-top: 16px;
-            padding: 12px;
-            border-radius: 8px;
-            background: #ff3b3015;
-            color: #ff6b6b;
-            font-size: 13px;
-            font-family: monospace;
-            white-space: pre-wrap;
-            word-break: break-all;
+            margin-top: 16px; padding: 12px; border-radius: 8px;
+            background: #ff3b3015; color: #ff6b6b;
+            font-size: 13px; font-family: monospace; white-space: pre-wrap; word-break: break-all;
         }
+        /* Admin panel */
+        .admin-panel { display: none; }
+        .admin-panel.active { display: block; }
+        .admin-panel textarea {
+            width: 100%; height: 120px; border-radius: 10px; border: none;
+            padding: 10px; font-size: 12px; font-family: monospace;
+            background: var(--tg-theme-secondary-bg-color, #2c2c2e);
+            color: var(--tg-theme-text-color, #fff); resize: vertical;
+        }
+        .btn {
+            display: block; width: 100%; padding: 12px; border-radius: 10px;
+            border: none; font-size: 14px; font-weight: 600; cursor: pointer;
+            margin-top: 8px; background: var(--tg-theme-button-color, #007aff);
+            color: var(--tg-theme-button-text-color, #fff);
+        }
+        .btn-danger { background: #ff453a; }
+        .btn-secondary {
+            background: var(--tg-theme-secondary-bg-color, #2c2c2e);
+            color: var(--tg-theme-text-color, #fff);
+        }
+        .status-msg {
+            margin-top: 8px; padding: 8px; border-radius: 8px;
+            font-size: 12px; text-align: center;
+        }
+        .status-ok { background: #30d15820; color: #30d158; }
+        .status-err { background: #ff453a20; color: #ff453a; }
     </style>
 </head>
 <body>
-    <h1>TMA Proof of Concept</h1>
+    <div class="header">
+        <div>
+            <h1>Finance Dashboard</h1>
+            <div class="sub" id="updated-label">loading...</div>
+        </div>
+        <div class="gear" id="gear-btn">&#9881;</div>
+    </div>
     <div id="app">
         <div class="fallback">
-            <div class="fallback-icon">&#128241;</div>
+            <div class="fallback-icon">&#128176;</div>
             <div class="fallback-text">Loading...</div>
         </div>
     </div>
+    <div id="admin" class="admin-panel"></div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-        try {
-            if (!window.Telegram?.WebApp) {
-                document.getElementById('app').innerHTML = `
-                    <div class="fallback">
-                        <div class="fallback-icon">&#128241;</div>
-                        <div class="fallback-text">Open this app from Telegram</div>
-                        <div style="font-size:13px;opacity:0.5;margin-top:8px">
-                            t.me/nk_mini_apps_bot/dashboard
-                        </div>
-                    </div>`;
-                throw new Error('Telegram WebApp SDK not available');
-            }
-
-            const tg = window.Telegram.WebApp;
-            tg.ready();
-            tg.expand();
-
-            const user = tg.initDataUnsafe?.user;
-            const app = document.getElementById('app');
-            const hintColor = tg.themeParams?.hint_color || '#8e8e93';
-            const linkColor = tg.themeParams?.link_color || '#007aff';
-
-            function card(title, value, detail, cls) {
-                return `<div class="card ${cls || ''}">
-                    <div class="card-title">${title}</div>
-                    <div class="card-value">${value}</div>
-                    ${detail ? `<div class="card-detail">${detail}</div>` : ''}
+    try {
+        if (!window.Telegram?.WebApp) {
+            document.getElementById('app').innerHTML = `
+                <div class="fallback">
+                    <div class="fallback-icon">&#128176;</div>
+                    <div class="fallback-text">Open from Telegram</div>
+                    <div style="font-size:13px;opacity:0.5;margin-top:8px">t.me/nk_mini_apps_bot/dashboard</div>
                 </div>`;
+            throw new Error('Telegram WebApp SDK not available');
+        }
+
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        const CS = tg.CloudStorage;
+        const app = document.getElementById('app');
+        const adminEl = document.getElementById('admin');
+        let adminMode = false;
+
+        const fmt = (n) => {
+            if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+            if (n >= 1000) return Math.round(n / 1000) + 'k';
+            return String(n);
+        };
+
+        const dotClass = (p) => ({ critical:'dot-critical', high:'dot-high', medium:'dot-medium', low:'dot-low', frozen:'dot-frozen' }[p] || 'dot-low');
+        const barClass = (pct) => pct > 100 ? 'bar-over' : pct > 75 ? 'bar-warn' : 'bar-ok';
+
+        // ── Load data from CloudStorage ──
+        function loadData() {
+            CS.getItems(['credits', 'budget', 'history', 'meta'], (err, data) => {
+                if (err) {
+                    showError('CloudStorage error: ' + err);
+                    return;
+                }
+                try {
+                    const credits = data.credits ? JSON.parse(data.credits) : null;
+                    const budget = data.budget ? JSON.parse(data.budget) : null;
+                    const history = data.history ? JSON.parse(data.history) : [];
+                    const meta = data.meta ? JSON.parse(data.meta) : {};
+
+                    if (!credits || !budget) {
+                        showSetup();
+                        return;
+                    }
+
+                    renderDashboard(credits, budget, history, meta);
+                } catch (e) {
+                    showError('Data parse error: ' + e.message);
+                }
+            });
+        }
+
+        function showSetup() {
+            document.getElementById('updated-label').textContent = 'no data';
+            app.innerHTML = `
+                <div class="fallback">
+                    <div class="fallback-icon">&#128203;</div>
+                    <div class="fallback-text">No data yet</div>
+                    <div style="font-size:13px;opacity:0.5">Tap &#9881; to import your data</div>
+                </div>`;
+        }
+
+        function showError(msg) {
+            app.innerHTML += `<div class="error-box">${msg}</div>`;
+        }
+
+        // ── Admin panel ──
+        document.getElementById('gear-btn').addEventListener('click', () => {
+            adminMode = !adminMode;
+            if (adminMode) {
+                adminEl.className = 'admin-panel active';
+                adminEl.innerHTML = `
+                    <div class="card">
+                        <div class="card-title">Import Credits JSON</div>
+                        <textarea id="credits-input" placeholder='[{"n":"MFO","b":99000,"r":292,"p":13000,"d":17,"pr":"critical"}]'></textarea>
+                        <button class="btn" onclick="saveKey('credits','credits-input')">Save Credits</button>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Import Budget JSON</div>
+                        <textarea id="budget-input" placeholder='[{"n":"Rent","l":21000,"s":21000}]'></textarea>
+                        <button class="btn" onclick="saveKey('budget','budget-input')">Save Budget</button>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Import History JSON</div>
+                        <textarea id="history-input" placeholder='[{"m":"Jan","t":175000}]'></textarea>
+                        <button class="btn" onclick="saveKey('history','history-input')">Save History</button>
+                    </div>
+                    <div id="admin-status"></div>
+                    <button class="btn btn-secondary" onclick="loadData();toggleAdmin();" style="margin-top:12px">Reload Dashboard</button>
+                    <button class="btn btn-danger" onclick="clearAll()" style="margin-top:8px">Clear All Data</button>
+                `;
+                // Pre-fill with current data
+                CS.getItems(['credits','budget','history'], (err, data) => {
+                    if (!err) {
+                        if (data.credits) document.getElementById('credits-input').value = data.credits;
+                        if (data.budget) document.getElementById('budget-input').value = data.budget;
+                        if (data.history) document.getElementById('history-input').value = data.history;
+                    }
+                });
+            } else {
+                adminEl.className = 'admin-panel';
+                adminEl.innerHTML = '';
             }
+        });
 
-            const checks = {
-                'WebApp SDK': !!tg.version,
-                'User Data': !!user,
-                'Theme Params': !!tg.themeParams?.bg_color,
-                'Platform': !!tg.platform,
-            };
+        window.toggleAdmin = () => {
+            adminMode = false;
+            adminEl.className = 'admin-panel';
+            adminEl.innerHTML = '';
+        };
 
-            const checksHtml = Object.entries(checks).map(([k, v]) =>
-                `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0">
-                    <span>${k}</span>
-                    <span class="status ${v ? 'status-ok' : 'status-fail'}">${v ? 'OK' : 'FAIL'}</span>
-                </div>`
-            ).join('');
+        window.saveKey = (key, inputId) => {
+            const val = document.getElementById(inputId).value.trim();
+            if (!val) return;
+            try {
+                JSON.parse(val); // validate
+            } catch (e) {
+                document.getElementById('admin-status').innerHTML = `<div class="status-msg status-err">Invalid JSON: ${e.message}</div>`;
+                return;
+            }
+            if (val.length > 4096) {
+                document.getElementById('admin-status').innerHTML = `<div class="status-msg status-err">Too large: ${val.length}/4096 bytes</div>`;
+                return;
+            }
+            CS.setItem(key, val, (err) => {
+                const statusEl = document.getElementById('admin-status');
+                if (err) {
+                    statusEl.innerHTML = `<div class="status-msg status-err">Error: ${err}</div>`;
+                } else {
+                    statusEl.innerHTML = `<div class="status-msg status-ok">${key} saved (${val.length} bytes)</div>`;
+                    // Update meta
+                    const now = new Date().toLocaleDateString('ru-RU');
+                    CS.setItem('meta', JSON.stringify({updated: now}));
+                }
+            });
+        };
 
-            const themeHtml = Object.entries(tg.themeParams || {}).map(([k, v]) =>
-                v ? `<div style="text-align:center">
-                    <div style="width:36px;height:36px;border-radius:8px;background:${v};border:1px solid ${hintColor}30"></div>
-                    <div style="font-size:10px;margin-top:4px;color:${hintColor}">${k.replace(/_/g,' ').replace('color','')}</div>
-                </div>` : ''
-            ).join('');
+        window.clearAll = () => {
+            if (!confirm('Delete all finance data from CloudStorage?')) return;
+            ['credits','budget','history','meta'].forEach(k => CS.removeItem(k));
+            document.getElementById('admin-status').innerHTML = `<div class="status-msg status-ok">All data cleared</div>`;
+            showSetup();
+        };
+
+        // ── Dashboard render ──
+        function renderDashboard(credits, budget, history, meta) {
+            document.getElementById('updated-label').textContent = meta.updated || '';
+
+            const totalDebt = credits.reduce((s, c) => s + (c.b || 0), 0);
+            const totalMinPay = credits.reduce((s, c) => s + (c.p || 0), 0);
+            const income = 349000;
+            const dti = Math.round((totalMinPay / income) * 100);
+            const budgetSpent = budget.reduce((s, b) => s + (b.s || 0), 0);
+            const budgetLimit = budget.reduce((s, b) => s + (b.l || 0), 0);
+
+            const debtsSorted = [...credits].sort((a, b) => (b.r || 0) - (a.r || 0));
+
+            const today = new Date().getDate();
+            const upcoming = credits
+                .filter(c => c.d && c.p > 0)
+                .sort((a, b) => {
+                    const da = a.d >= today ? a.d - today : a.d + 30 - today;
+                    const db = b.d >= today ? b.d - today : b.d + 30 - today;
+                    return da - db;
+                })
+                .slice(0, 7);
+
+            const chartMax = history.length ? Math.max(...history.map(h => h.t)) : 1;
 
             app.innerHTML = `
-                <div class="grid">
-                    ${card('User', user ? `${user.first_name} ${user.last_name || ''}` : 'N/A',
-                        user ? `@${user.username} &middot; ID: ${user.id}` : 'Open from Telegram to see data')}
-                    ${card('Platform', tg.platform || 'unknown',
-                        `SDK v${tg.version} &middot; ${tg.colorScheme} mode`)}
-                </div>
-                <div class="card full">
-                    <div class="card-title">API Checks</div>
-                    ${checksHtml}
-                </div>
-                <div class="card full">
-                    <div class="card-title">Theme Colors</div>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-                        ${themeHtml}
+                <div class="kpi-row">
+                    <div class="kpi">
+                        <div class="kpi-label">Debt</div>
+                        <div class="kpi-value red">${fmt(totalDebt)}</div>
+                    </div>
+                    <div class="kpi">
+                        <div class="kpi-label">DTI</div>
+                        <div class="kpi-value ${dti > 50 ? 'red' : dti > 30 ? 'orange' : 'green'}">${dti}%</div>
+                    </div>
+                    <div class="kpi">
+                        <div class="kpi-label">Budget</div>
+                        <div class="kpi-value ${budgetSpent > budgetLimit ? 'red' : 'green'}">${fmt(budgetSpent)}/${fmt(budgetLimit)}</div>
                     </div>
                 </div>
-                <div style="text-align:center;margin-top:20px;font-size:12px;color:${hintColor}">
-                    Pipeline: Claude Code &rarr; GitHub Pages &rarr; BotFather &rarr; TMA
+
+                <div class="tabs">
+                    <div class="tab active" data-tab="budget">Budget</div>
+                    <div class="tab" data-tab="debts">Debts</div>
+                    <div class="tab" data-tab="calendar">Calendar</div>
                 </div>
+
+                <div class="tab-content active" id="tab-budget">
+                    <div class="card">
+                        <div class="card-title">Monthly Spending</div>
+                        ${budget.map(b => {
+                            const pct = b.l > 0 ? Math.min(Math.round(((b.s||0) / b.l) * 100), 200) : 0;
+                            return `<div class="budget-row">
+                                <span class="budget-name">${b.n}</span>
+                                <span class="budget-nums">${fmt(b.s||0)}/${fmt(b.l)}</span>
+                                <div class="budget-bar-bg"><div class="budget-bar ${barClass(pct)}" style="width:${Math.min(pct,100)}%"></div></div>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                    ${history.length ? `<div class="card">
+                        <div class="card-title">Spending Trend</div>
+                        <div class="chart-row">
+                            ${history.map(h => {
+                                const pct = Math.round(((h.t||0) / chartMax) * 100);
+                                return `<div class="chart-bar-wrap">
+                                    <div class="chart-bar" style="height:${pct}%"></div>
+                                    <div class="chart-label">${h.m}</div>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </div>` : ''}
+                </div>
+
+                <div class="tab-content" id="tab-debts">
+                    <div class="card">
+                        <div class="card-title">Avalanche Priority <span class="window-badge">Window till Jul</span></div>
+                        ${debtsSorted.map(d => `
+                            <div class="debt-item">
+                                <div class="priority-dot ${dotClass(d.pr || 'low')}"></div>
+                                <span class="debt-name">${d.n}${d.pp ? ' *' : ''}</span>
+                                <span class="debt-rate">${d.r || 0}%</span>
+                                <span class="debt-balance">${fmt(d.b || 0)}</span>
+                            </div>
+                        `).join('')}
+                        <div style="font-size:11px;opacity:0.4;margin-top:8px">* prepaid till Jul 2026</div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="tab-calendar">
+                    <div class="card">
+                        <div class="card-title">Upcoming Payments</div>
+                        ${upcoming.map(c => `
+                            <div class="pay-item">
+                                <span class="pay-date">${c.d}</span>
+                                <span class="pay-name">${c.n}</span>
+                                <span class="pay-amount">${fmt(c.p)}</span>
+                            </div>
+                        `).join('')}
+                        <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;font-size:13px">
+                            <span style="opacity:0.5">Total min/month</span>
+                            <span style="font-weight:700">${fmt(totalMinPay)}</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Income Schedule</div>
+                        <div class="pay-item">
+                            <span class="pay-date">5</span>
+                            <span class="pay-name">Salary (main)</span>
+                            <span class="pay-amount" style="color:#30d158">+230k</span>
+                        </div>
+                        <div class="pay-item">
+                            <span class="pay-date">20</span>
+                            <span class="pay-name">Advance</span>
+                            <span class="pay-amount" style="color:#30d158">+119k</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="footer">Data stored in Telegram CloudStorage &middot; Tap &#9881; to manage</div>
             `;
 
-            tg.MainButton.setText('Close App');
-            tg.MainButton.show();
-            tg.MainButton.onClick(() => tg.close());
-
-        } catch (e) {
-            console.error('TMA init error:', e);
-            const errBox = document.createElement('div');
-            errBox.className = 'error-box';
-            errBox.textContent = `Error: ${e.message}\n\nUA: ${navigator.userAgent}`;
-            document.getElementById('app').appendChild(errBox);
+            // Tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+                    tab.classList.add('active');
+                    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+                });
+            });
         }
+
+        // ── Main button ──
+        tg.MainButton.setText('Close');
+        tg.MainButton.show();
+        tg.MainButton.onClick(() => tg.close());
+
+        // ── Init ──
+        loadData();
+
+    } catch (e) {
+        console.error('TMA init error:', e);
+        const errBox = document.createElement('div');
+        errBox.className = 'error-box';
+        errBox.textContent = `Error: ${e.message}\n\nUA: ${navigator.userAgent}`;
+        document.getElementById('app').appendChild(errBox);
+    }
     </script>
 </body>
 </html>
