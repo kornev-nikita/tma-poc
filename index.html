@@ -255,9 +255,9 @@
                         <div class="card-title">Spending Trend</div>
                         <div class="chart-row">
                             ${history.map(h => {
-                                const pct = Math.round(((h.t||0) / chartMax) * 100);
+                                const ht = Math.round(((h.t||0) / chartMax) * 48);
                                 return `<div class="chart-bar-wrap">
-                                    <div class="chart-bar" style="height:${pct}%"></div>
+                                    <div class="chart-bar" style="height:${ht}px"></div>
                                     <div class="chart-label">${h.m}</div>
                                 </div>`;
                             }).join('')}
