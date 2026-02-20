@@ -109,32 +109,7 @@
             background: #ff3b3015; color: #ff6b6b;
             font-size: 13px; font-family: monospace; white-space: pre-wrap; word-break: break-all;
         }
-        /* Admin panel */
-        .admin-panel { display: none; }
-        .admin-panel.active { display: block; }
-        .admin-panel textarea {
-            width: 100%; height: 120px; border-radius: 10px; border: none;
-            padding: 10px; font-size: 12px; font-family: monospace;
-            background: var(--tg-theme-secondary-bg-color, #2c2c2e);
-            color: var(--tg-theme-text-color, #fff); resize: vertical;
-        }
-        .btn {
-            display: block; width: 100%; padding: 12px; border-radius: 10px;
-            border: none; font-size: 14px; font-weight: 600; cursor: pointer;
-            margin-top: 8px; background: var(--tg-theme-button-color, #007aff);
-            color: var(--tg-theme-button-text-color, #fff);
-        }
-        .btn-danger { background: #ff453a; }
-        .btn-secondary {
-            background: var(--tg-theme-secondary-bg-color, #2c2c2e);
-            color: var(--tg-theme-text-color, #fff);
-        }
-        .status-msg {
-            margin-top: 8px; padding: 8px; border-radius: 8px;
-            font-size: 12px; text-align: center;
-        }
-        .status-ok { background: #30d15820; color: #30d158; }
-        .status-err { background: #ff453a20; color: #ff453a; }
+        .gear:active { opacity: 0.5; }
     </style>
 </head>
 <body>
@@ -151,29 +126,18 @@
             <div class="fallback-text">Loading...</div>
         </div>
     </div>
-    <div id="admin" class="admin-panel"></div>
-
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
     try {
-        if (!window.Telegram?.WebApp) {
-            document.getElementById('app').innerHTML = `
-                <div class="fallback">
-                    <div class="fallback-icon">&#128176;</div>
-                    <div class="fallback-text">Open from Telegram</div>
-                    <div style="font-size:13px;opacity:0.5;margin-top:8px">t.me/nk_mini_apps_bot/dashboard</div>
-                </div>`;
-            throw new Error('Telegram WebApp SDK not available');
-        }
-
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
-
-        const CS = tg.CloudStorage;
+        const BASE = 'https://kornev-nikita.github.io/tma-poc/data';
         const app = document.getElementById('app');
-        const adminEl = document.getElementById('admin');
-        let adminMode = false;
+        let tg = null;
+
+        if (window.Telegram?.WebApp) {
+            tg = window.Telegram.WebApp;
+            tg.ready();
+            tg.expand();
+        }
 
         const fmt = (n) => {
             if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
@@ -184,29 +148,31 @@
         const dotClass = (p) => ({ critical:'dot-critical', high:'dot-high', medium:'dot-medium', low:'dot-low', frozen:'dot-frozen' }[p] || 'dot-low');
         const barClass = (pct) => pct > 100 ? 'bar-over' : pct > 75 ? 'bar-warn' : 'bar-ok';
 
-        // ── Load data from CloudStorage ──
-        function loadData() {
-            CS.getItems(['credits', 'budget', 'history', 'meta'], (err, data) => {
-                if (err) {
-                    showError('CloudStorage error: ' + err);
+        // ── Load data from GitHub Pages ──
+        async function loadData() {
+            try {
+                const cb = '?v=' + Date.now();
+                const [creditsRes, budgetRes, historyRes, metaRes] = await Promise.all([
+                    fetch(BASE + '/credits.json' + cb),
+                    fetch(BASE + '/budget.json' + cb),
+                    fetch(BASE + '/history.json' + cb),
+                    fetch(BASE + '/meta.json' + cb).catch(() => null)
+                ]);
+
+                if (!creditsRes.ok || !budgetRes.ok) {
+                    showSetup();
                     return;
                 }
-                try {
-                    const credits = data.credits ? JSON.parse(data.credits) : null;
-                    const budget = data.budget ? JSON.parse(data.budget) : null;
-                    const history = data.history ? JSON.parse(data.history) : [];
-                    const meta = data.meta ? JSON.parse(data.meta) : {};
 
-                    if (!credits || !budget) {
-                        showSetup();
-                        return;
-                    }
+                const credits = await creditsRes.json();
+                const budget = await budgetRes.json();
+                const history = historyRes.ok ? await historyRes.json() : [];
+                const meta = metaRes?.ok ? await metaRes.json() : {};
 
-                    renderDashboard(credits, budget, history, meta);
-                } catch (e) {
-                    showError('Data parse error: ' + e.message);
-                }
-            });
+                renderDashboard(credits, budget, history, meta);
+            } catch (e) {
+                showError('Load error: ' + e.message);
+            }
         }
 
         function showSetup() {
@@ -215,7 +181,7 @@
                 <div class="fallback">
                     <div class="fallback-icon">&#128203;</div>
                     <div class="fallback-text">No data yet</div>
-                    <div style="font-size:13px;opacity:0.5">Tap &#9881; to import your data</div>
+                    <div style="font-size:13px;opacity:0.5">Data will appear after first sync</div>
                 </div>`;
         }
 
@@ -223,83 +189,8 @@
             app.innerHTML += `<div class="error-box">${msg}</div>`;
         }
 
-        // ── Admin panel ──
-        document.getElementById('gear-btn').addEventListener('click', () => {
-            adminMode = !adminMode;
-            if (adminMode) {
-                adminEl.className = 'admin-panel active';
-                adminEl.innerHTML = `
-                    <div class="card">
-                        <div class="card-title">Import Credits JSON</div>
-                        <textarea id="credits-input" placeholder='[{"n":"MFO","b":99000,"r":292,"p":13000,"d":17,"pr":"critical"}]'></textarea>
-                        <button class="btn" onclick="saveKey('credits','credits-input')">Save Credits</button>
-                    </div>
-                    <div class="card">
-                        <div class="card-title">Import Budget JSON</div>
-                        <textarea id="budget-input" placeholder='[{"n":"Rent","l":21000,"s":21000}]'></textarea>
-                        <button class="btn" onclick="saveKey('budget','budget-input')">Save Budget</button>
-                    </div>
-                    <div class="card">
-                        <div class="card-title">Import History JSON</div>
-                        <textarea id="history-input" placeholder='[{"m":"Jan","t":175000}]'></textarea>
-                        <button class="btn" onclick="saveKey('history','history-input')">Save History</button>
-                    </div>
-                    <div id="admin-status"></div>
-                    <button class="btn btn-secondary" onclick="loadData();toggleAdmin();" style="margin-top:12px">Reload Dashboard</button>
-                    <button class="btn btn-danger" onclick="clearAll()" style="margin-top:8px">Clear All Data</button>
-                `;
-                // Pre-fill with current data
-                CS.getItems(['credits','budget','history'], (err, data) => {
-                    if (!err) {
-                        if (data.credits) document.getElementById('credits-input').value = data.credits;
-                        if (data.budget) document.getElementById('budget-input').value = data.budget;
-                        if (data.history) document.getElementById('history-input').value = data.history;
-                    }
-                });
-            } else {
-                adminEl.className = 'admin-panel';
-                adminEl.innerHTML = '';
-            }
-        });
-
-        window.toggleAdmin = () => {
-            adminMode = false;
-            adminEl.className = 'admin-panel';
-            adminEl.innerHTML = '';
-        };
-
-        window.saveKey = (key, inputId) => {
-            const val = document.getElementById(inputId).value.trim();
-            if (!val) return;
-            try {
-                JSON.parse(val); // validate
-            } catch (e) {
-                document.getElementById('admin-status').innerHTML = `<div class="status-msg status-err">Invalid JSON: ${e.message}</div>`;
-                return;
-            }
-            if (val.length > 4096) {
-                document.getElementById('admin-status').innerHTML = `<div class="status-msg status-err">Too large: ${val.length}/4096 bytes</div>`;
-                return;
-            }
-            CS.setItem(key, val, (err) => {
-                const statusEl = document.getElementById('admin-status');
-                if (err) {
-                    statusEl.innerHTML = `<div class="status-msg status-err">Error: ${err}</div>`;
-                } else {
-                    statusEl.innerHTML = `<div class="status-msg status-ok">${key} saved (${val.length} bytes)</div>`;
-                    // Update meta
-                    const now = new Date().toLocaleDateString('ru-RU');
-                    CS.setItem('meta', JSON.stringify({updated: now}));
-                }
-            });
-        };
-
-        window.clearAll = () => {
-            if (!confirm('Delete all finance data from CloudStorage?')) return;
-            ['credits','budget','history','meta'].forEach(k => CS.removeItem(k));
-            document.getElementById('admin-status').innerHTML = `<div class="status-msg status-ok">All data cleared</div>`;
-            showSetup();
-        };
+        // ── Gear = reload ──
+        document.getElementById('gear-btn').addEventListener('click', () => loadData());
 
         // ── Dashboard render ──
         function renderDashboard(credits, budget, history, meta) {
@@ -419,7 +310,7 @@
                     </div>
                 </div>
 
-                <div class="footer">Data stored in Telegram CloudStorage &middot; Tap &#9881; to manage</div>
+                <div class="footer">Auto-synced &middot; Tap &#9881; to refresh</div>
             `;
 
             // Tabs
@@ -434,9 +325,11 @@
         }
 
         // ── Main button ──
-        tg.MainButton.setText('Close');
-        tg.MainButton.show();
-        tg.MainButton.onClick(() => tg.close());
+        if (tg) {
+            tg.MainButton.setText('Close');
+            tg.MainButton.show();
+            tg.MainButton.onClick(() => tg.close());
+        }
 
         // ── Init ──
         loadData();
