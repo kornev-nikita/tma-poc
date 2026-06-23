@@ -78,9 +78,21 @@ body{
   align-items:center; justify-content:center; padding:20px; z-index:50; cursor:zoom-out; }
 .lb.on{ display:flex; }
 .lb img{ max-width:100%; max-height:100%; border-radius:8px; }
+
+/* тулбар действий (прилипает сверху при скролле) */
+.toolbar{ position:sticky; top:0; z-index:10; background:var(--bg);
+  display:flex; gap:8px; padding:10px 0 8px; margin-bottom:4px; }
+.toolbar button{ font:inherit; font-size:13px; color:var(--link);
+  background:var(--sec-bg); border:none; border-radius:8px;
+  padding:7px 12px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.toolbar button:active{ opacity:.55; }
 </style>
 </head>
 <body>
+<div class="toolbar" id="toolbar">
+  <button data-act="collapseAll">⊟ свернуть всё</button>
+  <button data-act="expandAll">⊞ развернуть всё</button>
+</div>
 <div id="app"></div>
 <div class="tip" id="tip">тап ▸ — свернуть · тап по • — нырнуть в узел · крошки сверху — назад</div>
 <div class="lb" id="lb"><img src="" alt=""></div>
@@ -117,6 +129,34 @@ const state = {
   root: [],                 // путь до текущего корня zoom ([] = весь конспект)
   collapsed: new Set(),     // ключи свёрнутых узлов
 };
+
+// ── Персист состояния (свёрнутые узлы + позиция zoom) между открытиями ──
+const LS_KEY = 'conspect_p15_state';
+function saveState(){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify({
+    root: state.root, collapsed: [...state.collapsed]
+  })); }catch(_){}
+}
+function loadState(){
+  try{ const s = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+    if(s){ if(Array.isArray(s.root)) state.root = s.root;
+           if(Array.isArray(s.collapsed)) state.collapsed = new Set(s.collapsed); }
+  }catch(_){}
+}
+
+// обойти все узлы-с-детьми под заданным path (для «свернуть всё»)
+function eachNodePath(node, path, cb){
+  if(!node.children) return;
+  node.children.forEach((ch, i) => {
+    const p = path.concat(i);
+    if(Array.isArray(ch.children) && ch.children.length){ cb(p); eachNodePath(ch, p, cb); }
+  });
+}
+function collapseAll(){
+  eachNodePath(nodeAt(state.root), state.root, p => state.collapsed.add(key(p)));
+  render();
+}
+function expandAll(){ state.collapsed.clear(); render(); }
 
 function isTextNode(n){ return typeof n.text === 'string'; }
 
@@ -173,6 +213,7 @@ function render(){
   // hash для «приватного якоря» на узел
   const h = state.root.length ? '#node='+key(state.root) : '#';
   if(location.hash !== h) history.replaceState(null,'',h);
+  saveState();
 }
 
 // ── Делегирование кликов ──
@@ -189,6 +230,14 @@ document.getElementById('app').addEventListener('click', e => {
 });
 document.getElementById('lb').addEventListener('click', () => document.getElementById('lb').classList.remove('on'));
 
+// кнопки тулбара
+document.getElementById('toolbar').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if(!b) return;
+  if(b.dataset.act === 'collapseAll') collapseAll();
+  else if(b.dataset.act === 'expandAll') expandAll();
+});
+
 // восстановление из hash (открытие «нырнувшим» в узел)
 function fromHash(){
   const m = location.hash.match(/node=([\d.]+)/);
@@ -198,7 +247,8 @@ function fromHash(){
 // ── Telegram WebApp init ──
 try{ if(window.Telegram && Telegram.WebApp){ Telegram.WebApp.ready(); Telegram.WebApp.expand(); } }catch(_){}
 
-fromHash();
+loadState();   // восстановить свёрнутые узлы + позицию zoom
+fromHash();    // явный якорь #node= перебивает сохранённую позицию
 render();
 </script>
 </body>
