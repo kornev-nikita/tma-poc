@@ -101,7 +101,7 @@ body{
   <button data-act="expandAll">⊞ развернуть всё</button>
 </div>
 <div id="app"></div>
-<div class="tip" id="tip">тап по строке — свернуть · тап по • — нырнуть в узел · крошки сверху — назад</div>
+<div class="tip" id="tip">тап по ▾/• слева — на весь экран · тап по тексту — свернуть · крошки сверху — назад</div>
 <div class="lb" id="lb"><img src="" alt=""></div>
 
 <script>
@@ -190,17 +190,18 @@ function renderChildren(node, path){
     const hasKids = Array.isArray(ch.children) && ch.children.length > 0;
     const collapsed = state.collapsed.has(key(p));
     const [mk, body] = splitMarker(ch.text);
-    // caret — только визуальный индикатор; тоггл вешается на всю строку
+    const k = key(p);
+    // ЛЕВЫЕ маркеры (caret + bullet) → zoom-in на весь экран (Workflowy)
     const caret = hasKids
-      ? '<span class="caret">'+(collapsed?'▸':'▾')+'</span>'
+      ? '<span class="caret" data-zoom="'+k+'">'+(collapsed?'▸':'▾')+'</span>'
       : '<span class="caret empty">▾</span>';
-    // bullet нырябелен (zoom) только у узлов-с-детьми
     const bullet = '<span class="bullet'+(hasKids?' zoomable':'')+'"'
-                 + (hasKids?' data-zoom="'+key(p)+'"':'')+'>'+mk+'</span>';
+                 + (hasKids?' data-zoom="'+k+'"':'')+'>'+mk+'</span>';
+    // ТЕКСТ строки → свернуть/развернуть на месте
     const cls = 'row' + (hasKids?' node':' leaf') + (collapsed?' collapsed':'') + g;
-    const toggleAttr = hasKids ? ' data-toggle="'+key(p)+'"' : '';
-    out += '<div class="'+cls+'"'+toggleAttr+'>'
-         +   caret + bullet + '<span class="txt">'+markup(body)+'</span>'
+    const txtAttr = hasKids ? ' data-toggle="'+k+'"' : '';
+    out += '<div class="'+cls+'">'
+         +   caret + bullet + '<span class="txt"'+txtAttr+'>'+markup(body)+'</span>'
          + '</div>';
     if(hasKids && !collapsed){
       out += '<div class="children">'+renderChildren(ch, p)+'</div>';
