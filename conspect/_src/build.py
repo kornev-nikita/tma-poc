@@ -28,9 +28,11 @@ def parse_outline(path):
         raw_lines = f.read().split("\n")
     root = {"text": "personality 15", "children": []}
     stack = [(-1, root)]            # (indent, node) — родители; терминалы не пушим
+    pending_blanks = 0             # пустые строки документа → воздух перед след. элементом
     for raw in raw_lines:
         line = raw.rstrip()
         if line.strip() == "":
+            pending_blanks += 1
             continue
         indent = len(line) - len(line.lstrip(" \t"))
         body = line.lstrip(" \t")
@@ -53,6 +55,9 @@ def parse_outline(path):
         kind = classify(content)
         if kind == "empty":
             continue
+        # воздух из пустых строк документа → на текущий элемент (потолок 3)
+        gap = pending_blanks
+        pending_blanks = 0
         # выбрать родителя по отступу
         if heading:
             while stack[-1][0] >= 0:
@@ -62,11 +67,16 @@ def parse_outline(path):
                 stack.pop()
         parent = stack[-1][1]
         if kind == "divider":
-            parent["children"].append({"divider": True})
+            d = {"divider": True}
+            if gap: d["gap_before"] = gap
+            parent["children"].append(d)
         elif kind == "arrow":
-            parent["children"].append({"arrow": True})
+            a = {"arrow": True}
+            if gap: a["gap_before"] = gap
+            parent["children"].append(a)
         else:
             node = {"text": content, "children": []}
+            if gap: node["gap_before"] = gap
             if heading:
                 node["heading"] = True
             parent["children"].append(node)
@@ -275,14 +285,20 @@ with open("/tmp/conspect-pdf/conspect.html", "w", encoding="utf-8") as f:
 
 # ── App: впечатать дерево-JSON в шаблон аутлайнера ──
 def strip_app(node):
-    """Очистить дерево для app: убрать служебные id/crumb/heading, оставить структуру."""
+    """Очистить дерево для app: убрать служебные id/crumb/heading, оставить структуру + воздух."""
+    g = node.get("gap_before")
     if node.get("divider"):
-        return {"divider": True}
+        d = {"divider": True}
+        if g: d["gap_before"] = g
+        return d
     if node.get("arrow"):
-        return {"arrow": True}
+        a = {"arrow": True}
+        if g: a["gap_before"] = g
+        return a
     if node.get("img"):
         return {"img": node["img"], "caption": node.get("caption", "")}
     out = {"text": node["text"]}
+    if g: out["gap_before"] = g
     kids = [strip_app(c) for c in node.get("children", [])]
     if kids:
         out["children"] = kids

@@ -37,28 +37,35 @@ body{
 .root-title strong{ font-weight:800; }
 
 /* ── Строка узла ── */
+/* line-height маркеров = первой строке текста (24px), чтобы caret/bullet
+   сидели ровно на одной высоте с текстом независимо от их кегля */
 .row{ display:flex; align-items:flex-start; gap:7px; padding:4px 0; }
+.row.node{ cursor:pointer; }          /* вся строка узла кликабельна → свернуть/развернуть */
 .caret{
   flex-shrink:0; width:16px; text-align:center; color:var(--hint);
-  font-size:11px; line-height:1.7; cursor:pointer; user-select:none; transition:transform .12s;
+  font-size:12px; line-height:24px; user-select:none;
 }
 .caret.empty{ visibility:hidden; }
 .bullet{
   flex-shrink:0; min-width:18px; text-align:left; color:var(--hint);
-  font-weight:700; line-height:1.55; cursor:pointer; user-select:none;
+  font-weight:700; font-size:16px; line-height:24px; user-select:none;
 }
-.bullet.zoomable{ color:var(--link); }
-.txt{ flex:1; min-width:0; }
+.bullet.zoomable{ color:var(--link); cursor:pointer; }
+.txt{ flex:1; min-width:0; line-height:1.5; }
 .txt mark{ background:var(--mark); color:#1e293b; padding:0 2px; border-radius:2px; }
 .txt strong{ font-weight:700; }
 .row.collapsed > .txt::after{
   content:'…'; color:var(--hint); margin-left:6px; font-weight:700;
 }
+/* пропуск из документа (пустые строки) → вертикальный воздух перед элементом */
+.row.gap1, .leaf.gap1, .divider.gap1, .arrow.gap1, .imgrow.gap1{ margin-top:12px; }
+.row.gap2, .leaf.gap2, .divider.gap2, .arrow.gap2, .imgrow.gap2{ margin-top:22px; }
+.row.gap3, .leaf.gap3, .divider.gap3, .arrow.gap3, .imgrow.gap3{ margin-top:34px; }
 
 /* стрелка-коннектор → разделитель --- --- ↓↓↓ --- --- */
-.arrow{ display:flex; align-items:center; gap:8px; color:var(--hint); font-size:12px; letter-spacing:.15em; padding:2px 0; }
-.arrow::before, .arrow::after{ content:''; flex:1; height:1px; background:var(--sec-bg); }
-.divider{ height:1px; background:var(--sec-bg); margin:5px 0; }
+.arrow{ display:flex; align-items:center; gap:8px; color:var(--hint); font-size:12px; font-weight:700; letter-spacing:.15em; padding:4px 0; }
+.arrow::before, .arrow::after{ content:''; flex:1; height:2px; background:var(--hint); opacity:.55; border-radius:1px; }
+.divider{ height:2px; background:var(--hint); opacity:.45; border-radius:1px; margin:9px 6px; }
 .txt code, .root-title code{ font-family:ui-monospace,Menlo,monospace; font-size:.92em; background:var(--sec-bg); padding:0 3px; border-radius:3px; }
 
 /* картинка-узел (выровнена под текст: caret+bullet+gaps) */
@@ -94,7 +101,7 @@ body{
   <button data-act="expandAll">⊞ развернуть всё</button>
 </div>
 <div id="app"></div>
-<div class="tip" id="tip">тап ▸ — свернуть · тап по • — нырнуть в узел · крошки сверху — назад</div>
+<div class="tip" id="tip">тап по строке — свернуть · тап по • — нырнуть в узел · крошки сверху — назад</div>
 <div class="lb" id="lb"><img src="" alt=""></div>
 
 <script>
@@ -160,27 +167,39 @@ function expandAll(){ state.collapsed.clear(); render(); }
 
 function isTextNode(n){ return typeof n.text === 'string'; }
 
+// класс воздуха из пустых строк документа (gap_before)
+function gapClass(ch){
+  const g = ch.gap_before || 0;
+  return g > 0 ? ' gap' + Math.min(g, 3) : '';
+}
+
 // рекурсивный рендер поддерева
 function renderChildren(node, path){
   if(!node.children) return '';
   let out = '';
   node.children.forEach((ch, i) => {
     const p = path.concat(i);
-    if(ch.divider){ out += '<div class="divider"></div>'; return; }
-    if(ch.arrow){ out += '<div class="arrow">↓↓↓</div>'; return; }
+    const g = gapClass(ch);
+    if(ch.divider){ out += '<div class="divider'+g+'"></div>'; return; }
+    if(ch.arrow){ out += '<div class="arrow'+g+'">↓↓↓</div>'; return; }
     if(ch.img){
-      out += '<figure class="imgrow"><img src="'+ch.img+'" data-full="'+ch.img+'" alt="img">'
+      out += '<figure class="imgrow'+g+'"><img src="'+ch.img+'" data-full="'+ch.img+'" alt="img">'
            + '<figcaption>'+esc(ch.caption||'')+'</figcaption></figure>';
       return;
     }
     const hasKids = Array.isArray(ch.children) && ch.children.length > 0;
     const collapsed = state.collapsed.has(key(p));
     const [mk, body] = splitMarker(ch.text);
+    // caret — только визуальный индикатор; тоггл вешается на всю строку
     const caret = hasKids
-      ? '<span class="caret" data-toggle="'+key(p)+'">'+(collapsed?'▸':'▾')+'</span>'
+      ? '<span class="caret">'+(collapsed?'▸':'▾')+'</span>'
       : '<span class="caret empty">▾</span>';
-    const bullet = '<span class="bullet'+(hasKids?' zoomable':'')+'" data-zoom="'+key(p)+'">'+mk+'</span>';
-    out += '<div class="row'+(collapsed?' collapsed':'')+'">'
+    // bullet нырябелен (zoom) только у узлов-с-детьми
+    const bullet = '<span class="bullet'+(hasKids?' zoomable':'')+'"'
+                 + (hasKids?' data-zoom="'+key(p)+'"':'')+'>'+mk+'</span>';
+    const cls = 'row' + (hasKids?' node':' leaf') + (collapsed?' collapsed':'') + g;
+    const toggleAttr = hasKids ? ' data-toggle="'+key(p)+'"' : '';
+    out += '<div class="'+cls+'"'+toggleAttr+'>'
          +   caret + bullet + '<span class="txt">'+markup(body)+'</span>'
          + '</div>';
     if(hasKids && !collapsed){
@@ -218,15 +237,17 @@ function render(){
 
 // ── Делегирование кликов ──
 document.getElementById('app').addEventListener('click', e => {
-  const tog = e.target.closest('[data-toggle]');
-  if(tog){ const k = tog.dataset.toggle;
-    state.collapsed.has(k) ? state.collapsed.delete(k) : state.collapsed.add(k); render(); return; }
-  const zm = e.target.closest('[data-zoom]');
-  if(zm){ state.root = zm.dataset.zoom ? zm.dataset.zoom.split('.').map(Number) : []; render(); return; }
+  // порядок важен: специфичные цели → zoom(bullet) → toggle(вся строка).
+  // bullet лежит внутри row[data-toggle], поэтому zoom проверяем РАНЬШЕ toggle.
   const cr = e.target.closest('[data-crumb]');
   if(cr){ const v = cr.dataset.crumb; state.root = v ? v.split('.').map(Number) : []; render(); return; }
   const img = e.target.closest('.imgrow img');
-  if(img){ const lb = document.getElementById('lb'); lb.querySelector('img').src = img.dataset.full; lb.classList.add('on'); }
+  if(img){ const lb = document.getElementById('lb'); lb.querySelector('img').src = img.dataset.full; lb.classList.add('on'); return; }
+  const zm = e.target.closest('[data-zoom]');
+  if(zm){ state.root = zm.dataset.zoom ? zm.dataset.zoom.split('.').map(Number) : []; render(); return; }
+  const tog = e.target.closest('[data-toggle]');
+  if(tog){ const k = tog.dataset.toggle;
+    state.collapsed.has(k) ? state.collapsed.delete(k) : state.collapsed.add(k); render(); return; }
 });
 document.getElementById('lb').addEventListener('click', () => document.getElementById('lb').classList.remove('on'));
 
