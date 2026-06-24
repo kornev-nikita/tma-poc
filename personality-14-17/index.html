@@ -68,8 +68,10 @@ body{
 .txt mark.hltr-red-light,.root-title mark.hltr-red-light{ background:#FF558240; }
 .txt mark.hltr-purple-light,.root-title mark.hltr-purple-light{ background:#D2B3FF78; }
 .txt s{ opacity:.5; }
-/* бывшая вики-ссылка [[..]] — цель в деплое недоступна → не кликаем, лишь помечаем пунктиром */
-.txt .wl{ color:var(--link); border-bottom:1px dotted var(--hint); }
+/* бывшая вики-ссылка [[..]] — некликабельна; сиреневый (accent Obsidian) + пунктир = «была ссылка» */
+.txt .wl{ color:#864ffe; border-bottom:1px dotted #864ffe; }
+/* одиночные [текст] (категории) — сиреневый как в Obsidian, без подчёркивания (не ссылка) */
+.txt .br{ color:#864ffe; }
 /* заголовки секций H1..H6 — акцент кеглем/весом, чтобы не теряться среди сотен узлов */
 .txt.h1,.txt.h2{ font-size:18.5px; font-weight:800; letter-spacing:-.01em; }
 .txt.h3{ font-size:17px; font-weight:800; }
@@ -149,6 +151,8 @@ function markup(t){
               : parts[0].replace(/#\^?[\w-]+$/,'').replace(/^\d+\s+/,'').replace(/^d_/,'').trim();
     return '<span class="wl">'+label+'</span>';
   });
+  // одиночные [текст] (категории/понятия автора) → сиреневый, как accent Obsidian (стандартное поведение волта)
+  t = t.replace(/\[([^\[\]]+)\]/g, '<span class="br">[$1]</span>');
   t = t.replace(/==(.+?)==/g, '<mark>$1</mark>');
   t = t.replace(/~~(.+?)~~/g, '<s>$1</s>');
   t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
