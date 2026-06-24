@@ -57,10 +57,11 @@ body{
 .row.collapsed > .txt::after{
   content:'…'; color:var(--hint); margin-left:6px; font-weight:700;
 }
-/* пропуск из документа (пустые строки) → вертикальный воздух перед элементом */
-.row.gap1, .leaf.gap1, .divider.gap1, .arrow.gap1, .imgrow.gap1{ margin-top:12px; }
-.row.gap2, .leaf.gap2, .divider.gap2, .arrow.gap2, .imgrow.gap2{ margin-top:22px; }
-.row.gap3, .leaf.gap3, .divider.gap3, .arrow.gap3, .imgrow.gap3{ margin-top:34px; }
+/* пропуск из документа (пустые строки) → вертикальный воздух перед элементом.
+   Пропорционально реальной высоте строки (≈24px): N пустых → N строк воздуха, потолок 3. */
+.row.gap1, .leaf.gap1, .divider.gap1, .arrow.gap1, .imgrow.gap1{ margin-top:24px; }
+.row.gap2, .leaf.gap2, .divider.gap2, .arrow.gap2, .imgrow.gap2{ margin-top:48px; }
+.row.gap3, .leaf.gap3, .divider.gap3, .arrow.gap3, .imgrow.gap3{ margin-top:72px; }
 
 /* стрелка-коннектор → разделитель --- --- ↓↓↓ --- --- */
 .arrow{ display:flex; align-items:center; gap:8px; color:var(--hint); font-size:12px; font-weight:700; letter-spacing:.15em; padding:4px 0; }
