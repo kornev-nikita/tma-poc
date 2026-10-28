@@ -62,7 +62,7 @@
 <body>
 <main>
   <h1>Запись встречи</h1>
-  <p class="sub" id="sub">Куски по 2,5 мин уходят в «cld: meet», Claude на Маке расшифровывает</p>
+  <p class="sub" id="sub">Куски по минуте уходят в «cld: meet», Claude на Маке расшифровывает</p>
 
   <div class="rec">
     <button id="btn">Начать</button>
@@ -112,7 +112,9 @@
     if (p.get('c')) store.set('chat', p.get('c'));
     history.replaceState(null, '', location.pathname);
   }
-  const cfg = () => ({ token: store.get('token', ''), chat: store.get('chat', ''), chunk: Math.max(30, +store.get('chunk', 150) || 150) });
+  // куски по 60 с с 28.10.2026 (было 150; Никита: «увеличим частоту до минуты»): сохранённое 150 — прежнее умолчание, переводится один раз
+  if (store.get('chunk', '') === '150' && !store.get('chunk60', '')) { store.set('chunk', '60'); store.set('chunk60', '1'); }
+  const cfg = () => ({ token: store.get('token', ''), chat: store.get('chat', ''), chunk: Math.max(30, +store.get('chunk', 60) || 60) });
   $('cToken').value = cfg().token; $('cChat').value = cfg().chat; $('cChunk').value = cfg().chunk;
   $('cSave').onclick = () => {
     store.set('token', $('cToken').value.trim()); store.set('chat', $('cChat').value.trim()); store.set('chunk', $('cChunk').value.trim());
