@@ -24,6 +24,7 @@
     font: 600 20px/1 inherit; font-family: inherit; box-shadow: 0 0 0 10px rgba(255,122,0,.14); touch-action: manipulation; }
   #btn.on { background: var(--bad); box-shadow: 0 0 0 10px rgba(255,90,79,.16); }
   #btn:disabled { opacity: .45; }
+  #btn.setup { background: #3a3a3f; box-shadow: 0 0 0 10px rgba(255,255,255,.06); font-size: 17px; }
   #clock { font: 600 40px/1 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 1px; }
   .meter { width: 100%; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
   .meter i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .1s linear; }
@@ -115,7 +116,7 @@
   $('cToken').value = cfg().token; $('cChat').value = cfg().chat; $('cChunk').value = cfg().chunk;
   $('cSave').onclick = () => {
     store.set('token', $('cToken').value.trim()); store.set('chat', $('cChat').value.trim()); store.set('chunk', $('cChunk').value.trim());
-    $('cfg').open = false; checkBot();
+    $('cfg').open = false; $('bar').className = ''; checkBot();
   };
 
   const pad = n => String(n).padStart(2, '0');
@@ -179,7 +180,13 @@
   }
 
   async function checkBot() {
-    if (!cfg().token || !cfg().chat) { setDot('dNet', 'tNet', 'warn', 'нет токена или чата — открой ссылку настройки из «cld: meet»'); $('cfg').open = true; return; }
+    if (!cfg().token || !cfg().chat) {
+      setDot('dNet', 'tNet', 'warn', 'нет токена или чата — открой ссылку настройки из «cld: meet»');
+      $('btn').textContent = 'Нужна настройка'; $('btn').classList.add('setup');
+      bar('Это устройство не настроено: в «cld: meet» открой «ссылку настройки» на нём — долгое нажатие → «Открыть в Safari»', 'err');
+      return;
+    }
+    $('btn').textContent = 'Начать'; $('btn').classList.remove('setup');
     try { const me = await api('getMe'); setDot('dNet', 'tNet', 'ok', `связь с Telegram: ок, бот @${me.username}`); }
     catch (e) { setDot('dNet', 'tNet', 'bad', `бот не отвечает: ${e.message}`); }
   }
@@ -232,13 +239,14 @@
   function rotate() { const old = rec; rec = recorder(); old.stop(); }
 
   async function start() {
-    if (!cfg().token || !cfg().chat) { checkBot(); return; }
+    if (!cfg().token || !cfg().chat) { checkBot(); $('cfg').open = true; $('cfg').scrollIntoView({ behavior: 'smooth' }); return; }
     const wlP = askWake(), vidP = askVideo();  // в самом нажатии — до любого await
-    $('btn').disabled = true;
+    $('btn').disabled = true; $('btn').textContent = 'Жду микрофон…';
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
     } catch (e) {
-      log(`нет доступа к микрофону: ${e.name}`); $('btn').disabled = false;
+      log(`нет доступа к микрофону: ${e.name}`); $('btn').disabled = false; $('btn').textContent = 'Начать';
+      bar(`Нет доступа к микрофону (${e.name}) — разреши его Safari: «аА» в адресной строке → настройки сайта`, 'err');
       wlP.then(l => l && typeof l.release === 'function' && l.release()); vid.pause(); return;
     }
     const d = new Date(); meetId = `meet_${stamp(d)}`; part = 0; t0 = Date.now();
