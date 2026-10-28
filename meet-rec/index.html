@@ -220,6 +220,7 @@
 
   // Запись: один поток микрофона, куски — новым MediaRecorder на каждый, старый останавливается сразу после старта нового
   let stream = null, rec = null, meetId = '', part = 0, t0 = 0, tick = 0, rot = 0, ac = null;
+  const SEP = '— — — — — — — — — — — — — —';
   const mime = ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
   const ext = mime.includes('mp4') ? 'm4a' : 'webm';
 
@@ -230,7 +231,11 @@
     r.onstop = () => {
       const blob = new Blob(bufs, { type: r.mimeType || mime });
       enqueue({ blob, part: n, name: `${meetId}_p${pad(n)}.${ext}`, caption: `${meetId} · кусок ${n} · ${hms(started)}–${hms(new Date())}` });
-      if (r.final) { finalPending = true; enqueue({ text: `⏹ ${meetId} — запись закончена, кусков: ${n}` }); }
+      if (r.final) {
+        finalPending = true;
+        enqueue({ text: `⏹ ${meetId} — запись закончена, кусков: ${n}` });
+        enqueue({ text: SEP });  // разделитель записей в чате (Никита 28.10.2026: «отделяй в чате разные записи разделителем»)
+      }
     };
     r.start();
     $('sParts').textContent = n;
