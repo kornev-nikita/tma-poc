@@ -46,6 +46,16 @@
   label { display: block; font-size: 13px; color: var(--dim); margin: 12px 0 4px; }
   label input { width: 100%; }
   .hint { color: var(--dim); font-size: 13px; margin-top: 10px; }
+  #wakeRow { cursor: pointer; }
+  #bar { position: fixed; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 12px); max-width: 456px; margin: 0 auto;
+    border-radius: 14px; overflow: hidden; background: #2a2a2d; color: #fff; font-size: 15px; font-weight: 500;
+    box-shadow: 0 6px 24px rgba(0,0,0,.45); transform: translateY(160%); transition: transform .25s ease; }
+  #bar.show { transform: none; }
+  #bar i { position: absolute; inset: 0 auto 0 0; width: 0; background: rgba(255,122,0,.35); transition: width .2s linear; }
+  #bar span { position: relative; display: block; padding: 14px 16px; }
+  #bar.done { background: #1f6b3a; } #bar.done i { width: 0 !important; }
+  #bar.err { background: #7a2420; }
+  #nosleep { position: fixed; width: 1px; height: 1px; opacity: .01; pointer-events: none; left: 0; top: 0; }
 </style>
 </head>
 <body>
@@ -65,7 +75,7 @@
     <div class="stat"><b id="sQueue">0</b><span>в очереди</span></div>
   </div>
 
-  <div class="row"><span class="dot" id="dWake"></span><span id="tWake">экран: удержание включится при старте</span></div>
+  <div class="row" id="wakeRow"><span class="dot" id="dWake"></span><span id="tWake">экран: удержание включится при старте</span></div>
   <div class="row"><span class="dot" id="dNet"></span><span id="tNet">связь с Telegram: не проверялась</span></div>
 
   <div class="note">
@@ -84,6 +94,8 @@
     <p class="hint">Токен хранится только в этом браузере. Ссылка настройки из «cld: meet» заполняет поля сама</p>
   </details>
 </main>
+<div id="bar"><i id="barFill"></i><span id="barText"></span></div>
+<video id="nosleep" playsinline muted loop preload="auto" src="data:video/mp4;base64,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"></video>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
@@ -112,11 +124,37 @@
   const log = t => { const li = document.createElement('li'); li.textContent = `${hms(new Date())} ${t}`; $('log').prepend(li); while ($('log').children.length > 30) $('log').lastChild.remove(); };
   const setDot = (dot, txt, cls, text) => { $(dot).className = 'dot ' + cls; $(txt).textContent = text; };
 
-  // Очередь отправки: куски и заметки строго по порядку, при сбое — повтор
-  const queue = []; let sending = false, sent = 0;
-  const api = (method, body) => fetch(`https://api.telegram.org/bot${cfg().token}/${method}`, { method: 'POST', body })
-    .then(r => r.json()).then(j => { if (!j.ok) throw new Error(j.description || 'ошибка Telegram'); return j.result; });
-  function enqueue(item) { queue.push(item); $('sQueue').textContent = queue.length; pump(); }
+  // Очередь отправки: куски и заметки строго по порядку, при сбое — повтор. XHR, а не fetch: у него есть прогресс загрузки
+  const queue = []; let sending = false, sent = 0, failing = false, finalPending = false, barTimer = 0;
+  const api = (method, body, onprog) => new Promise((res, rej) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', `https://api.telegram.org/bot${cfg().token}/${method}`);
+    x.timeout = 180000;
+    if (onprog) x.upload.onprogress = e => { if (e.lengthComputable) onprog(e.loaded / e.total); };
+    x.onload = () => { let j; try { j = JSON.parse(x.responseText); } catch (e) { return rej(new Error('ответ не JSON')); }
+      j.ok ? res(j.result) : rej(new Error(j.description || 'ошибка Telegram')); };
+    x.onerror = () => rej(new Error('нет связи')); x.ontimeout = () => rej(new Error('таймаут'));
+    x.send(body || null);
+  });
+
+  // Полоса внизу: после «Стоп» — загрузка последнего куска и «можно закрывать»; во время записи — только если копятся неотправленные
+  function bar(text, cls, frac) {
+    clearTimeout(barTimer);
+    $('bar').className = 'show ' + (cls || ''); $('barText').textContent = text;
+    $('barFill').style.width = frac == null ? '0' : Math.round(frac * 100) + '%';
+  }
+  function barUpdate(frac) {
+    const docs = queue.filter(q => q.blob).length;
+    if (!queue.length) {
+      if (!rec && finalPending) { finalPending = false; bar('Всё отправлено — можно закрывать', 'done'); barTimer = setTimeout(() => { $('bar').className = ''; }, 7000); }
+      else if (rec) $('bar').className = '';
+      return;
+    }
+    if (!rec) bar(`${failing ? 'Нет связи — ' : ''}Отправляю ${docs > 1 ? 'куски: ' + docs : 'последний кусок'}${frac != null ? ' — ' + Math.round(frac * 100) + ' %' : ''}, не закрывай страницу`, failing ? 'err' : '', frac);
+    else if (failing || docs > 1) bar(`Нет связи — ждут отправки: ${docs}, отправлю, когда появится`, 'err');
+  }
+
+  function enqueue(item) { queue.push(item); $('sQueue').textContent = queue.length; barUpdate(); pump(); }
   async function pump() {
     if (sending) return; sending = true;
     let wait = 3000;
@@ -124,13 +162,15 @@
       const it = queue[0], f = new FormData();
       f.append('chat_id', cfg().chat); f.append('disable_notification', 'true');
       try {
-        if (it.blob) { f.append('caption', it.caption); f.append('document', it.blob, it.name); await api('sendDocument', f); }
+        if (it.blob) { f.append('caption', it.caption); f.append('document', it.blob, it.name); await api('sendDocument', f, barUpdate); }
         else { f.append('text', it.text); await api('sendMessage', f); }
-        queue.shift(); sent += it.blob ? 1 : 0; wait = 3000;
+        queue.shift(); sent += it.blob ? 1 : 0; wait = 3000; failing = false;
         $('sSent').textContent = sent; $('sQueue').textContent = queue.length;
         setDot('dNet', 'tNet', 'ok', `связь с Telegram: ок, последнее — ${hms(new Date())}`);
         if (it.blob) log(`кусок ${it.part} отправлен (${Math.round(it.blob.size / 1024)} КБ)`);
+        barUpdate();
       } catch (e) {
+        failing = true; barUpdate();
         setDot('dNet', 'tNet', 'bad', `не отправилось: ${e.message} — повтор через ${wait / 1000} с`);
         await new Promise(r => setTimeout(r, wait)); wait = Math.min(wait * 2, 30000);
       }
@@ -144,19 +184,29 @@
     catch (e) { setDot('dNet', 'tNet', 'bad', `бот не отвечает: ${e.message}`); }
   }
 
-  // Экран не гаснет, пока идёт запись (Screen Wake Lock)
+  // Экран не гаснет, пока идёт запись. Safari даёт Wake Lock только прямо в нажатии (28.10.2026 на iPad — NotAllowedError,
+  // когда просили после запроса микрофона), поэтому просим в первой строке обработчика. Не дали — невидимое беззвучное
+  // видео на повторе: пока видео играет, iOS экран не гасит, а беззвучное видео Safari запускает и без нажатия
   let wakeLock = null;
-  async function wake() {
-    if (!('wakeLock' in navigator)) { setDot('dWake', 'tWake', 'bad', 'экран: браузер не умеет его держать — поставь автоблокировку «Никогда»'); return; }
-    try {
-      wakeLock = await navigator.wakeLock.request('screen');
+  const vid = $('nosleep');
+  const askWake = () => ('wakeLock' in navigator) ? navigator.wakeLock.request('screen').then(l => l, e => e) : Promise.resolve(new Error('NoWakeLock'));
+  const askVideo = () => vid.play().then(() => true, e => e);
+  async function keepAwake(wlP, vidP) {
+    const wl = await wlP;
+    if (wl && typeof wl.release === 'function') {
+      wakeLock = wl; vid.pause();
       setDot('dWake', 'tWake', 'ok', 'экран не гаснет, пока идёт запись');
-      wakeLock.addEventListener('release', () => { if (rec) setDot('dWake', 'tWake', 'warn', 'удержание экрана снято — верну, когда страница снова на экране'); });
-    } catch (e) { setDot('dWake', 'tWake', 'bad', `экран: не удалось удержать (${e.name})`); }
+      wl.addEventListener('release', () => { if (rec) { setDot('dWake', 'tWake', 'warn', 'удержание экрана снято — держу видео-заглушкой'); askVideo(); } });
+      return;
+    }
+    const v = await vidP;
+    if (v === true) { setDot('dWake', 'tWake', 'ok', 'экран не гаснет (видео-заглушка)'); log(`Wake Lock не дали (${(wl && wl.name) || wl}) — держу экран видео`); }
+    else setDot('dWake', 'tWake', 'bad', 'экран может погаснуть — нажми сюда, чтобы удержать, или поставь автоблокировку «Никогда»');
   }
+  $('wakeRow').onclick = () => { if (rec) keepAwake(askWake(), askVideo()); };
   document.addEventListener('visibilitychange', () => {
     if (!rec) return;
-    if (document.visibilityState === 'visible') { log('страница снова на экране'); if (!wakeLock || wakeLock.released) wake(); }
+    if (document.visibilityState === 'visible') { log('страница снова на экране'); if (!wakeLock || wakeLock.released) keepAwake(askWake(), askVideo()); }
     else log('страница ушла с экрана — запись может встать');
   });
   window.addEventListener('beforeunload', e => { if (rec || queue.length) { e.preventDefault(); e.returnValue = ''; } });
@@ -173,7 +223,7 @@
     r.onstop = () => {
       const blob = new Blob(bufs, { type: r.mimeType || mime });
       enqueue({ blob, part: n, name: `${meetId}_p${pad(n)}.${ext}`, caption: `${meetId} · кусок ${n} · ${hms(started)}–${hms(new Date())}` });
-      if (r.final) enqueue({ text: `⏹ ${meetId} — запись закончена, кусков: ${n}` });
+      if (r.final) { finalPending = true; enqueue({ text: `⏹ ${meetId} — запись закончена, кусков: ${n}` }); }
     };
     r.start();
     $('sParts').textContent = n;
@@ -183,10 +233,14 @@
 
   async function start() {
     if (!cfg().token || !cfg().chat) { checkBot(); return; }
+    const wlP = askWake(), vidP = askVideo();  // в самом нажатии — до любого await
     $('btn').disabled = true;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
-    } catch (e) { log(`нет доступа к микрофону: ${e.name}`); $('btn').disabled = false; return; }
+    } catch (e) {
+      log(`нет доступа к микрофону: ${e.name}`); $('btn').disabled = false;
+      wlP.then(l => l && typeof l.release === 'function' && l.release()); vid.pause(); return;
+    }
     const d = new Date(); meetId = `meet_${stamp(d)}`; part = 0; t0 = Date.now();
     enqueue({ text: `▶ ${meetId} — запись началась, куски по ${cfg().chunk} с` });
     rec = recorder();
@@ -197,7 +251,7 @@
     tr.onunmute = () => log('микрофон снова пишет');
     tr.onended = () => { log('микрофон отключён — останавливаю'); stop(); };
     meter();
-    await wake();
+    await keepAwake(wlP, vidP);
     $('btn').textContent = 'Стоп'; $('btn').classList.add('on'); $('btn').disabled = false;
     log(`запись ${meetId}, формат ${mime || 'по умолчанию'}`);
   }
@@ -209,7 +263,9 @@
     stream.getTracks().forEach(t => t.stop());
     if (ac) { ac.close(); ac = null; }
     if (wakeLock) { wakeLock.release(); wakeLock = null; }
+    vid.pause();
     setDot('dWake', 'tWake', '', 'экран: удержание снято');
+    bar('Завершаю запись — не закрывай страницу', '');
     $('btn').textContent = 'Начать'; $('btn').classList.remove('on'); $('lvl').style.width = '0';
     log('стоп — последний кусок уходит в очередь');
   }
