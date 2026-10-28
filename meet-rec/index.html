@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121212">
+<title>Запись встречи</title>
+<style>
+  :root {
+    --bg: #121212; --card: #1d1d1f; --line: #2c2c2e; --text: #f2f2f2; --dim: #9a9aa0;
+    --accent: #FF7A00; --ok: #3ccf6e; --warn: #ffb020; --bad: #ff5a4f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+  main { max-width: 480px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 20px) 16px calc(env(safe-area-inset-bottom) + 24px); }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+  .sub { color: var(--dim); font-size: 14px; margin: 0 0 20px; }
+  .rec { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 24px 0 8px; }
+  #btn { width: 168px; height: 168px; border-radius: 50%; border: 0; background: var(--accent); color: #fff;
+    font: 600 20px/1 inherit; font-family: inherit; box-shadow: 0 0 0 10px rgba(255,122,0,.14); touch-action: manipulation; }
+  #btn.on { background: var(--bad); box-shadow: 0 0 0 10px rgba(255,90,79,.16); }
+  #btn:disabled { opacity: .45; }
+  #clock { font: 600 40px/1 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 1px; }
+  .meter { width: 100%; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .1s linear; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 18px 0; }
+  .stat { background: var(--card); border-radius: 12px; padding: 10px 12px; }
+  .stat b { display: block; font-size: 22px; font-weight: 600; }
+  .stat span { color: var(--dim); font-size: 12px; }
+  .row { display: flex; align-items: center; gap: 8px; color: var(--dim); font-size: 14px; margin: 6px 0; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); flex: none; }
+  .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.bad { background: var(--bad); }
+  .note { display: flex; gap: 8px; margin: 18px 0 8px; }
+  .note input { flex: 1; min-width: 0; }
+  input, button.small { font: inherit; font-size: 16px; color: var(--text); background: var(--card); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; }
+  button.small { background: var(--line); }
+  #log { list-style: none; margin: 14px 0 0; padding: 0; font-size: 13px; color: var(--dim); }
+  #log li { padding: 5px 0; border-top: 1px solid var(--line); }
+  details { margin-top: 22px; background: var(--card); border-radius: 12px; padding: 12px 14px; }
+  summary { cursor: pointer; color: var(--dim); }
+  label { display: block; font-size: 13px; color: var(--dim); margin: 12px 0 4px; }
+  label input { width: 100%; }
+  .hint { color: var(--dim); font-size: 13px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Запись встречи</h1>
+  <p class="sub" id="sub">Куски по 2,5 мин уходят в «cld: meet», Claude на Маке расшифровывает</p>
+
+  <div class="rec">
+    <button id="btn">Начать</button>
+    <div id="clock">00:00</div>
+    <div class="meter"><i id="lvl"></i></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b id="sParts">0</b><span>кусков</span></div>
+    <div class="stat"><b id="sSent">0</b><span>отправлено</span></div>
+    <div class="stat"><b id="sQueue">0</b><span>в очереди</span></div>
+  </div>
+
+  <div class="row"><span class="dot" id="dWake"></span><span id="tWake">экран: удержание включится при старте</span></div>
+  <div class="row"><span class="dot" id="dNet"></span><span id="tNet">связь с Telegram: не проверялась</span></div>
+
+  <div class="note">
+    <input id="noteText" placeholder="Написать Claude по ходу встречи" enterkeyhint="send">
+    <button class="small" id="noteBtn">→</button>
+  </div>
+
+  <ul id="log"></ul>
+
+  <details id="cfg">
+    <summary>Настройки</summary>
+    <label>Токен бота<input id="cToken" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    <label>Чат (chat_id)<input id="cChat" inputmode="numeric" autocomplete="off"></label>
+    <label>Длина куска, с<input id="cChunk" inputmode="numeric"></label>
+    <button class="small" id="cSave" style="margin-top:12px">Сохранить</button>
+    <p class="hint">Токен хранится только в этом браузере. Ссылка настройки из «cld: meet» заполняет поля сама</p>
+  </details>
+</main>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(k, d) { try { return localStorage.getItem('meetrec.' + k) ?? d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('meetrec.' + k, v); } catch (e) {} },
+  };
+
+  // Ссылка настройки: …#t=ТОКЕН&c=ЧАТ — сохранить и убрать из адресной строки
+  if (location.hash.length > 1) {
+    const p = new URLSearchParams(location.hash.slice(1));
+    if (p.get('t')) store.set('token', p.get('t'));
+    if (p.get('c')) store.set('chat', p.get('c'));
+    history.replaceState(null, '', location.pathname);
+  }
+  const cfg = () => ({ token: store.get('token', ''), chat: store.get('chat', ''), chunk: Math.max(30, +store.get('chunk', 150) || 150) });
+  $('cToken').value = cfg().token; $('cChat').value = cfg().chat; $('cChunk').value = cfg().chunk;
+  $('cSave').onclick = () => {
+    store.set('token', $('cToken').value.trim()); store.set('chat', $('cChat').value.trim()); store.set('chunk', $('cChunk').value.trim());
+    $('cfg').open = false; checkBot();
+  };
+
+  const pad = n => String(n).padStart(2, '0');
+  const hms = d => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  const stamp = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+  const log = t => { const li = document.createElement('li'); li.textContent = `${hms(new Date())} ${t}`; $('log').prepend(li); while ($('log').children.length > 30) $('log').lastChild.remove(); };
+  const setDot = (dot, txt, cls, text) => { $(dot).className = 'dot ' + cls; $(txt).textContent = text; };
+
+  // Очередь отправки: куски и заметки строго по порядку, при сбое — повтор
+  const queue = []; let sending = false, sent = 0;
+  const api = (method, body) => fetch(`https://api.telegram.org/bot${cfg().token}/${method}`, { method: 'POST', body })
+    .then(r => r.json()).then(j => { if (!j.ok) throw new Error(j.description || 'ошибка Telegram'); return j.result; });
+  function enqueue(item) { queue.push(item); $('sQueue').textContent = queue.length; pump(); }
+  async function pump() {
+    if (sending) return; sending = true;
+    let wait = 3000;
+    while (queue.length) {
+      const it = queue[0], f = new FormData();
+      f.append('chat_id', cfg().chat); f.append('disable_notification', 'true');
+      try {
+        if (it.blob) { f.append('caption', it.caption); f.append('document', it.blob, it.name); await api('sendDocument', f); }
+        else { f.append('text', it.text); await api('sendMessage', f); }
+        queue.shift(); sent += it.blob ? 1 : 0; wait = 3000;
+        $('sSent').textContent = sent; $('sQueue').textContent = queue.length;
+        setDot('dNet', 'tNet', 'ok', `связь с Telegram: ок, последнее — ${hms(new Date())}`);
+        if (it.blob) log(`кусок ${it.part} отправлен (${Math.round(it.blob.size / 1024)} КБ)`);
+      } catch (e) {
+        setDot('dNet', 'tNet', 'bad', `не отправилось: ${e.message} — повтор через ${wait / 1000} с`);
+        await new Promise(r => setTimeout(r, wait)); wait = Math.min(wait * 2, 30000);
+      }
+    }
+    sending = false;
+  }
+
+  async function checkBot() {
+    if (!cfg().token || !cfg().chat) { setDot('dNet', 'tNet', 'warn', 'нет токена или чата — открой ссылку настройки из «cld: meet»'); $('cfg').open = true; return; }
+    try { const me = await api('getMe'); setDot('dNet', 'tNet', 'ok', `связь с Telegram: ок, бот @${me.username}`); }
+    catch (e) { setDot('dNet', 'tNet', 'bad', `бот не отвечает: ${e.message}`); }
+  }
+
+  // Экран не гаснет, пока идёт запись (Screen Wake Lock)
+  let wakeLock = null;
+  async function wake() {
+    if (!('wakeLock' in navigator)) { setDot('dWake', 'tWake', 'bad', 'экран: браузер не умеет его держать — поставь автоблокировку «Никогда»'); return; }
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      setDot('dWake', 'tWake', 'ok', 'экран не гаснет, пока идёт запись');
+      wakeLock.addEventListener('release', () => { if (rec) setDot('dWake', 'tWake', 'warn', 'удержание экрана снято — верну, когда страница снова на экране'); });
+    } catch (e) { setDot('dWake', 'tWake', 'bad', `экран: не удалось удержать (${e.name})`); }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!rec) return;
+    if (document.visibilityState === 'visible') { log('страница снова на экране'); if (!wakeLock || wakeLock.released) wake(); }
+    else log('страница ушла с экрана — запись может встать');
+  });
+  window.addEventListener('beforeunload', e => { if (rec || queue.length) { e.preventDefault(); e.returnValue = ''; } });
+
+  // Запись: один поток микрофона, куски — новым MediaRecorder на каждый, старый останавливается сразу после старта нового
+  let stream = null, rec = null, meetId = '', part = 0, t0 = 0, tick = 0, rot = 0, ac = null;
+  const mime = ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
+  const ext = mime.includes('mp4') ? 'm4a' : 'webm';
+
+  function recorder() {
+    const r = new MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 64000 } : undefined);
+    const n = ++part, started = new Date(), bufs = [];
+    r.ondataavailable = e => { if (e.data && e.data.size) bufs.push(e.data); };
+    r.onstop = () => {
+      const blob = new Blob(bufs, { type: r.mimeType || mime });
+      enqueue({ blob, part: n, name: `${meetId}_p${pad(n)}.${ext}`, caption: `${meetId} · кусок ${n} · ${hms(started)}–${hms(new Date())}` });
+      if (r.final) enqueue({ text: `⏹ ${meetId} — запись закончена, кусков: ${n}` });
+    };
+    r.start();
+    $('sParts').textContent = n;
+    return r;
+  }
+  function rotate() { const old = rec; rec = recorder(); old.stop(); }
+
+  async function start() {
+    if (!cfg().token || !cfg().chat) { checkBot(); return; }
+    $('btn').disabled = true;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
+    } catch (e) { log(`нет доступа к микрофону: ${e.name}`); $('btn').disabled = false; return; }
+    const d = new Date(); meetId = `meet_${stamp(d)}`; part = 0; t0 = Date.now();
+    enqueue({ text: `▶ ${meetId} — запись началась, куски по ${cfg().chunk} с` });
+    rec = recorder();
+    rot = setInterval(rotate, cfg().chunk * 1000);
+    tick = setInterval(() => { const s = Math.floor((Date.now() - t0) / 1000); $('clock').textContent = `${s >= 3600 ? Math.floor(s / 3600) + ':' : ''}${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`; }, 500);
+    const tr = stream.getAudioTracks()[0];
+    tr.onmute = () => log('микрофон приостановлен системой (звонок или другое приложение?)');
+    tr.onunmute = () => log('микрофон снова пишет');
+    tr.onended = () => { log('микрофон отключён — останавливаю'); stop(); };
+    meter();
+    await wake();
+    $('btn').textContent = 'Стоп'; $('btn').classList.add('on'); $('btn').disabled = false;
+    log(`запись ${meetId}, формат ${mime || 'по умолчанию'}`);
+  }
+
+  function stop() {
+    if (!rec) return;
+    clearInterval(rot); clearInterval(tick);
+    const last = rec; rec = null; last.final = true; last.stop();
+    stream.getTracks().forEach(t => t.stop());
+    if (ac) { ac.close(); ac = null; }
+    if (wakeLock) { wakeLock.release(); wakeLock = null; }
+    setDot('dWake', 'tWake', '', 'экран: удержание снято');
+    $('btn').textContent = 'Начать'; $('btn').classList.remove('on'); $('lvl').style.width = '0';
+    log('стоп — последний кусок уходит в очередь');
+  }
+
+  function meter() {
+    try {
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      const an = ac.createAnalyser(); an.fftSize = 1024;
+      ac.createMediaStreamSource(stream).connect(an);
+      const buf = new Float32Array(an.fftSize);
+      const loop = () => { if (!ac) return; an.getFloatTimeDomainData(buf); let m = 0; for (const v of buf) m = Math.max(m, Math.abs(v));
+        $('lvl').style.width = Math.min(100, Math.round(Math.sqrt(m) * 100)) + '%'; requestAnimationFrame(loop); };
+      loop();
+    } catch (e) { log('индикатор уровня недоступен'); }
+  }
+
+  $('btn').onclick = () => (rec ? stop() : start());
+  const sendNote = () => {
+    const t = $('noteText').value.trim(); if (!t) return;
+    enqueue({ text: `✍ ${meetId || 'вне записи'}: ${t}` }); $('noteText').value = ''; log('заметка Claude поставлена в очередь');
+  };
+  $('noteBtn').onclick = sendNote;
+  $('noteText').addEventListener('keydown', e => { if (e.key === 'Enter') sendNote(); });
+
+  if (!window.MediaRecorder) log('этот браузер не умеет MediaRecorder — открой в Safari');
+  checkBot();
+})();
+</script>
+</body>
+</html>
